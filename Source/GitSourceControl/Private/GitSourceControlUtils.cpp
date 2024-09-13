@@ -1838,13 +1838,20 @@ bool RunDumpToFile(const FString& InPathToGitBinary, const FString& InRepository
 			FPlatformProcess::ReadPipeToArray(PipeRead, BinaryData);
 			if (BinaryData.Num() > 0)
 			{
-				// @todo: this is hacky!
-				if (BinaryData[0] == 68) // Check for D in "Downloading"
+				if (GitSourceControl.AccessSettings().IsUsingGitLfsLocking())
 				{
-					if (BinaryData[BinaryData.Num() - 1] == 10) // Check for newline
+					// @todo: this is hacky!
+					if (BinaryData[0] == 68) // Check for D in "Downloading"
 					{
-						BinaryData.Reset();
-						bRemovedLFSMessage = true;
+						if (BinaryData[BinaryData.Num() - 1] == 10) // Check for newline
+						{
+							BinaryData.Reset();
+							bRemovedLFSMessage = true;
+						}
+					}
+					else
+					{
+						BinaryFileContent.Append(MoveTemp(BinaryData));
 					}
 				}
 				else
@@ -1857,21 +1864,28 @@ bool RunDumpToFile(const FString& InPathToGitBinary, const FString& InRepository
 		FPlatformProcess::ReadPipeToArray(PipeRead, BinaryData);
 		if (BinaryData.Num() > 0)
 		{
-			// @todo: this is hacky!
-			if (!bRemovedLFSMessage && BinaryData[0] == 68) // Check for D in "Downloading"
+			if (GitSourceControl.AccessSettings().IsUsingGitLfsLocking())
 			{
-				int32 NewLineIndex = 0;
-				for (int32 Index = 0; Index < BinaryData.Num(); Index++)
+				// @todo: this is hacky!
+				if (!bRemovedLFSMessage && BinaryData[0] == 68) // Check for D in "Downloading"
 				{
-					if (BinaryData[Index] == 10) // Check for newline
+					int32 NewLineIndex = 0;
+					for (int32 Index = 0; Index < BinaryData.Num(); Index++)
 					{
-						NewLineIndex = Index;
-						break;
+						if (BinaryData[Index] == 10) // Check for newline
+						{
+							NewLineIndex = Index;
+							break;
+						}
+					}
+					if (NewLineIndex > 0)
+					{
+						BinaryData.RemoveAt(0, NewLineIndex + 1);
 					}
 				}
-				if (NewLineIndex > 0)
+				else
 				{
-					BinaryData.RemoveAt(0, NewLineIndex + 1);
+					BinaryFileContent.Append(MoveTemp(BinaryData));
 				}
 			}
 			else
