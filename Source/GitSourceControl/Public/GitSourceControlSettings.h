@@ -29,6 +29,10 @@ public:
 	/** Set the username used by the Git LFS 2 File Locks server */
 	bool SetLfsUserName(const FString& InString);
 
+	const TSoftClassPtr<class UGitLockProviderBase> GetLockProviderClass() const;
+
+	bool SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider);
+
 	/** Load settings from ini file */
 	void LoadSettings();
 
@@ -47,4 +51,6 @@ private:
 
 	/** Username used by the Git LFS 2 File Locks server */
 	FString LfsUserName;
+
+	TSoftClassPtr<class UGitLockProviderBase> LockProviderClass;
 };

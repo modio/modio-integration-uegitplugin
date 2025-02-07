@@ -74,6 +74,14 @@ void FGitSourceControlSettings::LoadSettings()
 	GConfig->GetString(*GitSettingsConstants::SettingsSection, TEXT("BinaryPath"), BinaryPath, IniFile);
 	GConfig->GetBool(*GitSettingsConstants::SettingsSection, TEXT("UsingGitLfsLocking"), bUsingGitLfsLocking, IniFile);
 	GConfig->GetString(*GitSettingsConstants::SettingsSection, TEXT("LfsUserName"), LfsUserName, IniFile);
+	FString LockProviderClassPath;
+	GConfig->GetString(*GitSettingsConstants::SettingsSection, TEXT("LockProviderClass"), LockProviderClassPath, IniFile);
+	if (LockProviderClassPath.IsEmpty())
+	{
+		LockProviderClassPath = TEXT("/Game/Blah/DefaultLockProvider");
+	}
+	LockProviderClass = TSoftClassPtr<class UGitLockProviderBase> {LockProviderClassPath};
+
 }
 
 void FGitSourceControlSettings::SaveSettings() const
@@ -83,4 +91,5 @@ void FGitSourceControlSettings::SaveSettings() const
 	GConfig->SetString(*GitSettingsConstants::SettingsSection, TEXT("BinaryPath"), *BinaryPath, IniFile);
 	GConfig->SetBool(*GitSettingsConstants::SettingsSection, TEXT("UsingGitLfsLocking"), bUsingGitLfsLocking, IniFile);
 	GConfig->SetString(*GitSettingsConstants::SettingsSection, TEXT("LfsUserName"), *LfsUserName, IniFile);
+	GConfig->SetString(*GitSettingsConstants::SettingsSection, TEXT("LockProviderClass"), LockProviderClass.ToString(), IniFile);
 }
