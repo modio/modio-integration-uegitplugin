@@ -5,15 +5,21 @@
 
 #pragma once
 
-#include "Widgets/SCompoundWidget.h"
 #include "ISourceControlProvider.h"
 #include "Runtime/Launch/Resources/Version.h"
+#include "Widgets/SCompoundWidget.h"
 
 class SNotificationItem;
 #if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
-namespace ETextCommit { enum Type : int; }
+namespace ETextCommit
+{
+	enum Type : int;
+}
 #else
-namespace ETextCommit { enum Type; }
+namespace ETextCommit
+{
+	enum Type;
+}
 #endif
 
 enum class ECheckBoxState : uint8;
@@ -21,28 +27,29 @@ enum class ECheckBoxState : uint8;
 class SGitSourceControlSettings : public SCompoundWidget
 {
 public:
-	
 	SLATE_BEGIN_ARGS(SGitSourceControlSettings) {}
-	
+
 	SLATE_END_ARGS()
 
 public:
-
 	void Construct(const FArguments& InArgs);
 
 	~SGitSourceControlSettings();
 
 private:
-	void ConstructBasedOnEngineVersion( );
+	void ConstructBasedOnEngineVersion();
 
 	/** Delegates to get Git binary path from/to settings */
 	FString GetBinaryPathString() const;
-	void OnBinaryPathPicked(const FString & PickedPath) const;
+	void OnBinaryPathPicked(const FString& PickedPath) const;
 
 	/** Delegate to get repository root, user name and email from provider */
 	FText GetPathToRepositoryRoot() const;
 	FText GetUserName() const;
 	FText GetUserEmail() const;
+
+	const UClass* GetLockProviderClass() const;
+	void SetLockProviderClass(const UClass* Value);
 
 	EVisibility MustInitializeGitRepository() const;
 	bool CanInitializeGitRepository() const;
@@ -92,7 +99,7 @@ private:
 
 	/** Asynchronous operation progress notifications */
 	TWeakPtr<SNotificationItem> OperationInProgressNotification;
-	
+
 	void DisplayInProgressNotification(const FSourceControlOperationRef& InOperation);
 	void RemoveInProgressNotification();
 	void DisplaySuccessNotification(const FSourceControlOperationRef& InOperation);

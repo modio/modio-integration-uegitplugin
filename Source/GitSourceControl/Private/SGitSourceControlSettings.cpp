@@ -5,30 +5,32 @@
 
 #include "SGitSourceControlSettings.h"
 
-#include "Runtime/Launch/Resources/Version.h"
+#include "EditorDirectories.h"
 #include "Fonts/SlateFontInfo.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SFilePathPicker.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SSeparator.h"
 #include "Widgets/Notifications/SNotificationList.h"
-#include "Framework/Notifications/NotificationManager.h"
-#include "EditorDirectories.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Text/STextBlock.h"
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #else
-#include "EditorStyleSet.h"
+	#include "EditorStyleSet.h"
 #endif
-#include "SourceControlOperations.h"
 #include "GitSourceControlModule.h"
 #include "GitSourceControlUtils.h"
-
+#include "IGitLockProvider.h"
+#include "LFSLockProvider.h"
+#include "PropertyCustomizationHelpers.h"
+#include "SourceControlOperations.h"
 
 #define LOCTEXT_NAMESPACE "SGitSourceControlSettings"
 
@@ -40,11 +42,12 @@ void SGitSourceControlSettings::Construct(const FArguments& InArgs)
 	bAutoInitialCommit = true;
 
 	InitialCommitMessage = LOCTEXT("InitialCommitMessage", "Initial commit");
-	ReadmeContent = FText::FromString(FString(TEXT("# ")) + FApp::GetProjectName() + "\n\nDeveloped with Unreal Engine\n");
+	ReadmeContent =
+		FText::FromString(FString(TEXT("# ")) + FApp::GetProjectName() + "\n\nDeveloped with Unreal Engine\n");
 
-	ConstructBasedOnEngineVersion( );
+	ConstructBasedOnEngineVersion();
 }
-
+// clang-format off
 #if ENGINE_MAJOR_VERSION < 5
 void SGitSourceControlSettings::ConstructBasedOnEngineVersion( )
 {
@@ -534,6 +537,26 @@ void SGitSourceControlSettings::ConstructBasedOnEngineVersion( )
 				.IsEnabled(this, &Self::GetIsUsingGitLfsLocking)
 				.HintText(LOCTEXT("LfsUserName_Hint", "Username to lock files on the LFS server"))
 			]
+		] +
+		 SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SHorizontalBox)
+			ROW_LEFT ( 10.0f )
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("LockProvider", "Lock Provider Class"))
+				.ToolTipText(LOCTEXT("LockProviderTT", "Class to use for get/set of lock status"))
+			]
+			ROW_RIGHT( 10.0f )
+			[
+				SNew(SClassPropertyEntryBox)
+				.RequiredInterface(UGitLockProvider::StaticClass())
+				.AllowAbstract(false)
+				.AllowNone(false)
+				.SelectedClass(this, &Self::GetLockProviderClass)
+				.OnSetClass(this, &Self::SetLockProviderClass)
+			]
 		]
 		// [Optional] Initial Git Commit
 		+SVerticalBox::Slot()
@@ -594,7 +617,7 @@ void SGitSourceControlSettings::ConstructBasedOnEngineVersion( )
 	// TODO [RW] The UE5 GUI for the two optional initial git support functionalities has not been tested
 }
 #endif
-
+// clang-format on
 SGitSourceControlSettings::~SGitSourceControlSettings()
 {
 	RemoveInProgressNotification();
@@ -606,16 +629,16 @@ FString SGitSourceControlSettings::GetBinaryPathString() const
 	return GitSourceControl.AccessSettings().GetBinaryPath();
 }
 
-void SGitSourceControlSettings::OnBinaryPathPicked( const FString& PickedPath ) const
+void SGitSourceControlSettings::OnBinaryPathPicked(const FString& PickedPath) const
 {
 	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
 	FString PickedFullPath = FPaths::ConvertRelativePathToFull(PickedPath);
 	const bool bChanged = GitSourceControl.AccessSettings().SetBinaryPath(PickedFullPath);
-	if(bChanged)
+	if (bChanged)
 	{
 		// Re-Check provided git binary path for each change
 		GitSourceControl.GetProvider().CheckGitAvailability();
-		if(GitSourceControl.GetProvider().IsGitAvailable())
+		if (GitSourceControl.GetProvider().IsGitAvailable())
 		{
 			GitSourceControl.SaveSettings();
 		}
@@ -641,6 +664,26 @@ FText SGitSourceControlSettings::GetUserEmail() const
 	const FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
 	const FString& UserEmail = GitSourceControl.GetProvider().GetUserEmail();
 	return FText::FromString(UserEmail);
+}
+
+const UClass* SGitSourceControlSettings::GetLockProviderClass() const
+{
+	const FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
+	TSoftClassPtr<UGitLockProviderBase> LockProviderClass = GitSourceControl.AccessSettings().GetLockProviderClass();
+	if (LockProviderClass.IsValid())
+	{
+		return LockProviderClass.LoadSynchronous();
+	}
+	else
+	{
+		return ULFSLockProvider::StaticClass();
+	}
+}
+
+void SGitSourceControlSettings::SetLockProviderClass(const UClass* Value)
+{
+	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
+	GitSourceControl.AccessSettings().SetLockProviderClass(Value);
 }
 
 EVisibility SGitSourceControlSettings::MustInitializeGitRepository() const
@@ -688,21 +731,26 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 	TArray<FString> ErrorMessages;
 
 	// 1.a. Synchronous (very quick) "git init" operation: initialize a Git local repository with a .git/ subdirectory
-	GitSourceControlUtils::RunCommand(TEXT("init"), PathToGitBinary, PathToProjectDir, FGitSourceControlModule::GetEmptyStringArray(), FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
-	// 1.b. Synchronous (very quick) "git remote add" operation: configure the URL of the default remote server 'origin' if specified
-	if(!RemoteUrl.IsEmpty())
+	GitSourceControlUtils::RunCommand(TEXT("init"), PathToGitBinary, PathToProjectDir,
+									  FGitSourceControlModule::GetEmptyStringArray(),
+									  FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
+	// 1.b. Synchronous (very quick) "git remote add" operation: configure the URL of the default remote server 'origin'
+	// if specified
+	if (!RemoteUrl.IsEmpty())
 	{
 		TArray<FString> Parameters;
 		Parameters.Add(TEXT("add origin"));
 		Parameters.Add(RemoteUrl.ToString());
-		GitSourceControlUtils::RunCommand(TEXT("remote"), PathToGitBinary, PathToProjectDir, Parameters, FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
+		GitSourceControlUtils::RunCommand(TEXT("remote"), PathToGitBinary, PathToProjectDir, Parameters,
+										  FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
 	}
 
 	// Check the new repository status to enable connection (branch, user e-mail)
 	GitSourceControl.GetProvider().CheckGitAvailability();
-	if(GitSourceControl.GetProvider().IsAvailable())
+	if (GitSourceControl.GetProvider().IsAvailable())
 	{
-		// List of files to add to Revision Control (.uproject, Config/, Content/, Source/ files and .gitignore/.gitattributes if any)
+		// List of files to add to Revision Control (.uproject, Config/, Content/, Source/ files and
+		// .gitignore/.gitattributes if any)
 		TArray<FString> ProjectFiles;
 		ProjectFiles.Add(FPaths::ProjectContentDir());
 		ProjectFiles.Add(FPaths::ProjectConfigDir());
@@ -711,29 +759,35 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 		{
 			ProjectFiles.Add(FPaths::GameSourceDir());
 		}
-		if(bAutoCreateGitIgnore)
+		if (bAutoCreateGitIgnore)
 		{
 			// 2.a. Create a standard ".gitignore" file with common patterns for a typical Blueprint & C++ project
 			const FString GitIgnoreFilename = FPaths::Combine(FPaths::ProjectDir(), TEXT(".gitignore"));
-			const FString GitIgnoreContent = TEXT("Binaries\nDerivedDataCache\nIntermediate\nSaved\n.vscode\n.vs\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.xcodeproj\n*.xcworkspace\n*.log");
-			if(FFileHelper::SaveStringToFile(GitIgnoreContent, *GitIgnoreFilename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+			const FString GitIgnoreContent =
+				TEXT("Binaries\nDerivedDataCache\nIntermediate\nSaved\n.vscode\n.vs\n*.VC.db\n*.opensdf\n*.opendb\n*."
+					 "sdf\n*.sln\n*.suo\n*.xcodeproj\n*.xcworkspace\n*.log");
+			if (FFileHelper::SaveStringToFile(GitIgnoreContent, *GitIgnoreFilename,
+											  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 			{
 				ProjectFiles.Add(GitIgnoreFilename);
 			}
 		}
-		if(bAutoCreateReadme)
+		if (bAutoCreateReadme)
 		{
 			// 2.b. Create a "README.md" file with a custom description
 			const FString ReadmeFilename = FPaths::Combine(FPaths::ProjectDir(), TEXT("README.md"));
-			if (FFileHelper::SaveStringToFile(ReadmeContent.ToString(), *ReadmeFilename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+			if (FFileHelper::SaveStringToFile(ReadmeContent.ToString(), *ReadmeFilename,
+											  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 			{
 				ProjectFiles.Add(ReadmeFilename);
 			}
 		}
-		if(bAutoCreateGitAttributes)
+		if (bAutoCreateGitAttributes)
 		{
 			// 2.c. Synchronous (very quick) "lfs install" operation: needs only to be run once by user
-			GitSourceControlUtils::RunCommand(TEXT("install"), PathToGitBinary, PathToProjectDir, FGitSourceControlModule::GetEmptyStringArray(), FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
+			GitSourceControlUtils::RunCommand(
+				TEXT("install"), PathToGitBinary, PathToProjectDir, FGitSourceControlModule::GetEmptyStringArray(),
+				FGitSourceControlModule::GetEmptyStringArray(), InfoMessages, ErrorMessages);
 
 			// 2.d. Create a ".gitattributes" file to enable Git LFS (Large File System) for the whole "Content/" subdir
 			const FString GitAttributesFilename = FPaths::Combine(FPaths::ProjectDir(), TEXT(".gitattributes"));
@@ -747,7 +801,8 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 			{
 				GitAttributesContent = TEXT("Content/** filter=lfs diff=lfs merge=lfs -text\n");
 			}
-			if(FFileHelper::SaveStringToFile(GitAttributesContent, *GitAttributesFilename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+			if (FFileHelper::SaveStringToFile(GitAttributesContent, *GitAttributesFilename,
+											  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 			{
 				ProjectFiles.Add(GitAttributesFilename);
 			}
@@ -769,9 +824,13 @@ void SGitSourceControlSettings::LaunchMarkForAddOperation(const TArray<FString>&
 	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
 	TSharedRef<FMarkForAdd, ESPMode::ThreadSafe> MarkForAddOperation = ISourceControlOperation::Create<FMarkForAdd>();
 #if ENGINE_MAJOR_VERSION >= 5
-	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(MarkForAddOperation, FSourceControlChangelistPtr(), InFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
+	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(
+		MarkForAddOperation, FSourceControlChangelistPtr(), InFiles, EConcurrency::Asynchronous,
+		FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
 #else
-	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(MarkForAddOperation, InFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
+	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(
+		MarkForAddOperation, InFiles, EConcurrency::Asynchronous,
+		FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
 #endif
 	if (Result == ECommandResult::Succeeded)
 	{
@@ -790,9 +849,14 @@ void SGitSourceControlSettings::LaunchCheckInOperation()
 	CheckInOperation->SetDescription(InitialCommitMessage);
 	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
 #if ENGINE_MAJOR_VERSION >= 5
-	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(CheckInOperation, FSourceControlChangelistPtr(), FGitSourceControlModule::GetEmptyStringArray(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
+	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(
+		CheckInOperation, FSourceControlChangelistPtr(), FGitSourceControlModule::GetEmptyStringArray(),
+		EConcurrency::Asynchronous,
+		FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
 #else
-	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(CheckInOperation, FGitSourceControlModule::GetEmptyStringArray(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
+	ECommandResult::Type Result = GitSourceControl.GetProvider().Execute(
+		CheckInOperation, FGitSourceControlModule::GetEmptyStringArray(), EConcurrency::Asynchronous,
+		FSourceControlOperationComplete::CreateSP(this, &SGitSourceControlSettings::OnSourceControlOperationComplete));
 #endif
 	if (Result == ECommandResult::Succeeded)
 	{
@@ -805,7 +869,8 @@ void SGitSourceControlSettings::LaunchCheckInOperation()
 }
 
 /// Delegate called when a Revision control operation has completed: launch the next one and manage notifications
-void SGitSourceControlSettings::OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
+void SGitSourceControlSettings::OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation,
+																 ECommandResult::Type InResult)
 {
 	RemoveInProgressNotification();
 
@@ -825,7 +890,6 @@ void SGitSourceControlSettings::OnSourceControlOperationComplete(const FSourceCo
 		LaunchCheckInOperation();
 	}
 }
-
 
 // Display an ongoing notification during the whole operation
 void SGitSourceControlSettings::DisplayInProgressNotification(const FSourceControlOperationRef& InOperation)
@@ -854,7 +918,8 @@ void SGitSourceControlSettings::RemoveInProgressNotification()
 // Display a temporary success notification at the end of the operation
 void SGitSourceControlSettings::DisplaySuccessNotification(const FSourceControlOperationRef& InOperation)
 {
-	const FText NotificationText = FText::Format(LOCTEXT("InitialCommit_Success", "{0} operation was successfull!"), FText::FromName(InOperation->GetName()));
+	const FText NotificationText = FText::Format(LOCTEXT("InitialCommit_Success", "{0} operation was successfull!"),
+												 FText::FromName(InOperation->GetName()));
 	FNotificationInfo Info(NotificationText);
 	Info.bUseSuccessFailIcons = true;
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
@@ -868,7 +933,8 @@ void SGitSourceControlSettings::DisplaySuccessNotification(const FSourceControlO
 // Display a temporary failure notification at the end of the operation
 void SGitSourceControlSettings::DisplayFailureNotification(const FSourceControlOperationRef& InOperation)
 {
-	const FText NotificationText = FText::Format(LOCTEXT("InitialCommit_Failure", "Error: {0} operation failed!"), FText::FromName(InOperation->GetName()));
+	const FText NotificationText = FText::Format(LOCTEXT("InitialCommit_Failure", "Error: {0} operation failed!"),
+												 FText::FromName(InOperation->GetName()));
 	FNotificationInfo Info(NotificationText);
 	Info.ExpireDuration = 8.0f;
 	FSlateNotificationManager::Get().AddNotification(Info);

@@ -66,6 +66,17 @@ bool FGitSourceControlSettings::SetLfsUserName(const FString& InString)
 	return bChanged;
 }
 
+const TSoftClassPtr<class UGitLockProviderBase> FGitSourceControlSettings::GetLockProviderClass() const
+{
+	return LockProviderClass;
+}
+
+bool FGitSourceControlSettings::SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider)
+{
+	LockProviderClass = Provider;
+	return true;
+}
+
 // This is called at startup nearly before anything else in our module: BinaryPath will then be used by the provider
 void FGitSourceControlSettings::LoadSettings()
 {
