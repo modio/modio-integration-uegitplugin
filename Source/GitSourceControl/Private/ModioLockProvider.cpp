@@ -14,6 +14,7 @@
 #include "Misc/App.h"
 #include "Misc/EngineVersionComparison.h"
 #include "Misc/Optional.h"
+#include "Serialization/JsonSerializer.h"
 
 TSharedRef<IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::GetLocksRequest()
 {
@@ -62,10 +63,9 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::UnlockFi
 	return Request;
 }
 
-TUnion<FString, EHttpRequestStatus::Type> UModioLockProvider::PerformHttpRequest(
-	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request)
+TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request)
 {
-	TUnion<FString, EHttpRequestStatus::Type> Result;
+	TUnion<FString, int32> Result;
 	bool bRequestDone = false;
 	Request->OnProcessRequestComplete().BindLambda(
 		[&](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully) {
@@ -75,7 +75,7 @@ TUnion<FString, EHttpRequestStatus::Type> UModioLockProvider::PerformHttpRequest
 			}
 			else
 			{
-				Result.SetSubtype<EHttpRequestStatus::Type>(Request->GetStatus());
+				Result.SetSubtype<int32>(Response->GetResponseCode());
 			}
 		});
 	Request->ProcessRequest();
@@ -84,6 +84,34 @@ TUnion<FString, EHttpRequestStatus::Type> UModioLockProvider::PerformHttpRequest
 		YieldThread();
 	}
 	return Result;
+}
+
+TSharedPtr<FJsonObject> UModioLockProvider::GetResponseAsJsonObject(const FString& ResponseString)
+{
+	TSharedPtr<FJsonStringReader> TopLevelJson = FJsonStringReader::Create(ResponseString);
+	TSharedPtr<FJsonObject> ParsedResponse;
+	if (!FJsonSerializer::Deserialize<TCHAR>(*TopLevelJson, ParsedResponse, FJsonSerializer::EFlags::None))
+	{
+		return nullptr;
+	}
+	else
+	{
+		return ParsedResponse;
+	}
+}
+
+TArray<TSharedPtr<FJsonValue>> UModioLockProvider::GetResponseAsJsonArray(const FString& ResponseString)
+{
+	TSharedPtr<FJsonStringReader> TopLevelJson = FJsonStringReader::Create(ResponseString);
+	TArray<TSharedPtr<FJsonValue>> ParsedResponse;
+	if (!FJsonSerializer::Deserialize<TCHAR>(*TopLevelJson, ParsedResponse, FJsonSerializer::EFlags::None))
+	{
+		return {};
+	}
+	else
+	{
+		return ParsedResponse;
+	}
 }
 
 void UModioLockProvider::YieldThread()
@@ -114,11 +142,22 @@ bool UModioLockProvider::GetLockedFiles(const FString& InRepositoryRoot, const F
 	auto Result = PerformHttpRequest(GetLocksRequest());
 	if (Result.GetCurrentSubtypeIndex() == 0)
 	{
-		// deserialize here
+		TArray<TSharedPtr<FJsonValue>> ResponseJSON = GetResponseAsJsonArray(Result.GetSubtype<FString>());
+
+		for (const auto& Element : ResponseJSON)
+		{
+			const TSharedPtr<FJsonObject>& ElementAsObject = Element->AsObject();
+			OutResults.Add(FString::Format(TEXT("{0}\t{1}\t{2}"), {ElementAsObject->GetStringField("username"),
+																   ElementAsObject->GetStringField("assetPath"),
+																   ElementAsObject->GetStringField("projectName")}));
+			// deserialize here
+		}
 		return true;
 	}
 	else
 	{
+		OutErrorMessages.Add(FString::Format(TEXT("Request for file lock list resulted in HTTP error {0}"),
+											 {Result.GetSubtype<int32>()}));
 		return false;
 	}
 }
@@ -135,6 +174,8 @@ bool UModioLockProvider::LockFiles(const FString& InRepositoryRoot, const FGitFi
 	}
 	else
 	{
+		OutErrorMessages.Add(FString::Format(TEXT("Request to lock file {0} resulted in HTTP error {1}"),
+											 {*Params.FileNames[0], Result.GetSubtype<int32>()}));
 		return false;
 	}
 }
@@ -151,6 +192,8 @@ bool UModioLockProvider::UnlockFiles(const FString& InRepositoryRoot, const FGit
 	}
 	else
 	{
+		OutErrorMessages.Add(FString::Format(TEXT("Request to unlock file {0} resulted in HTTP error {1}"),
+											 {*Params.FileNames[0], Result.GetSubtype<int32>()}));
 		return false;
 	}
 }

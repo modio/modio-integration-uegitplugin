@@ -10,10 +10,6 @@
 
 #include "ModioLockProvider.generated.h"
 
-namespace EHttpRequestStatus
-{
-	enum Type;
-}
 /**
  *
  */
@@ -29,8 +25,10 @@ class UModioLockProvider : public UObject, public IGitLockProvider
 																		  const FString& FilePath,
 																		  const FString& ProjectName);
 
-	TUnion<FString, EHttpRequestStatus::Type> PerformHttpRequest(
-		TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> Request);
+	TUnion<FString, int32> PerformHttpRequest(TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> Request);
+
+	TSharedPtr<FJsonObject> GetResponseAsJsonObject(const FString& ResponseString);
+	TArray<TSharedPtr<FJsonValue>> GetResponseAsJsonArray(const FString& ResponseString);
 
 	void YieldThread();
 

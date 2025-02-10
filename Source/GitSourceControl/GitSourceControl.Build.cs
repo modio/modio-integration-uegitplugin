@@ -23,7 +23,8 @@ public class GitSourceControl : ModuleRules
 				"SourceControlWindows",
 				"Projects",
 				"PropertyEditor",
-				"HTTP"
+				"HTTP",
+				"Json"
 			}
 		);
 
