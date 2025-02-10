@@ -13,4 +13,13 @@ public:
 							   const FString& GitBinaryFallback, const TArray<FString>& InParameters,
 							   const TArray<FString>& InFiles, TArray<FString>& OutResults,
 							   TArray<FString>& OutErrorMessages) override;
+
+	virtual bool GetLockedFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
+								TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
+
+	virtual bool LockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
+						   TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
+
+	virtual bool UnlockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
+							 TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
 };

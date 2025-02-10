@@ -683,7 +683,7 @@ const UClass* SGitSourceControlSettings::GetLockProviderClass() const
 void SGitSourceControlSettings::SetLockProviderClass(const UClass* Value)
 {
 	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
-	GitSourceControl.AccessSettings().SetLockProviderClass(Value);
+	GitSourceControl.SetLockProviderClass(Value);
 }
 
 EVisibility SGitSourceControlSettings::MustInitializeGitRepository() const

@@ -22,7 +22,8 @@ public class GitSourceControl : ModuleRules
 				"SourceControl",
 				"SourceControlWindows",
 				"Projects",
-				"PropertyEditor"
+				"PropertyEditor",
+				"HTTP"
 			}
 		);
 

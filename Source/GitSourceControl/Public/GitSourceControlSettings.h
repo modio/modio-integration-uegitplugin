@@ -12,7 +12,7 @@ class GITSOURCECONTROL_API FGitSourceControlSettings
 {
 public:
 	/** Get the Git Binary Path */
-	const FString & GetBinaryPath() const;
+	const FString& GetBinaryPath() const;
 
 	/** Set the Git Binary Path */
 	bool SetBinaryPath(const FString& InString);
@@ -31,8 +31,6 @@ public:
 
 	const TSoftClassPtr<class UGitLockProviderBase> GetLockProviderClass() const;
 
-	bool SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider);
-
 	/** Load settings from ini file */
 	void LoadSettings();
 
@@ -40,6 +38,9 @@ public:
 	void SaveSettings() const;
 
 private:
+	friend class FGitSourceControlModule;
+	bool SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider);
+
 	/** A critical section for settings access */
 	mutable FCriticalSection CriticalSection;
 
