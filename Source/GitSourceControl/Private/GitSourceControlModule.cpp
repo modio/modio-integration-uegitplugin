@@ -163,6 +163,8 @@ void FGitSourceControlModule::UpdateLockProviderInstance()
 	}
 
 	LockProvider.Reset(NewObject<UGitLockProviderBase>(GetTransientPackage(), LockProviderClass));
+	TArray<FString> Errors;
+	LockProvider->ConfigureWithSettings(GitSourceControlSettings.GetLockProviderSettings(), Errors);
 }
 
 void FGitSourceControlModule::ShutdownModule()

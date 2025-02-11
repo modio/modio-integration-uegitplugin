@@ -14,7 +14,7 @@
  *
  */
 UCLASS()
-class UModioLockProvider : public UObject, public IGitLockProvider
+class UModioLockProvider : public UGitLockProviderBase
 {
 	GENERATED_BODY()
 	TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> GetLocksRequest();
@@ -31,6 +31,7 @@ class UModioLockProvider : public UObject, public IGitLockProvider
 	TArray<TSharedPtr<FJsonValue>> GetResponseAsJsonArray(const FString& ResponseString);
 
 	void YieldThread();
+	FString ServerAddress;
 
 public:
 	bool RunLFSCommand(const FString& InCommand, const FString& InRepositoryRoot, const FString& GitBinaryFallback,
@@ -45,4 +46,6 @@ public:
 
 	bool UnlockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params, TArray<FString>& OutResults,
 					 TArray<FString>& OutErrorMessages) override;
+
+	bool ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors) override;
 };

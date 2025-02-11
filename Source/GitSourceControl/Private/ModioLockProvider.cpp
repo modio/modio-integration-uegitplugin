@@ -197,3 +197,25 @@ bool UModioLockProvider::UnlockFiles(const FString& InRepositoryRoot, const FGit
 		return false;
 	}
 }
+
+bool UModioLockProvider::ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors)
+{
+	if (NewSettings.SettingValues.Contains("ServerAddress"))
+	{
+		if (NewSettings.SettingValues.Contains("ServerPort"))
+		{
+			ServerAddress = FString::Format(TEXT("https://{0}:{1}"), {NewSettings.SettingValues["ServerAddress"],
+																	  NewSettings.SettingValues["ServerPort"]});
+			return true;
+		}
+		else
+		{
+			OutErrors.Add("ServerPort setting missing");
+		}
+	}
+	else
+	{
+		OutErrors.Add("ServerAddress setting missing");
+	}
+	return false;
+}

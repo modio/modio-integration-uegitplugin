@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GitLockProviderSettings.h"
+
 #include "IGitLockProvider.generated.h"
 
 UINTERFACE(meta = (CannotImplementInterfaceInBlueprint))
@@ -20,6 +22,7 @@ class IGitLockProvider
 {
 	GENERATED_BODY()
 public:
+	virtual bool ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors) = 0;
 	virtual bool RunLFSCommand(const FString& InCommand, const FString& InRepositoryRoot,
 							   const FString& GitBinaryFallback, const TArray<FString>& InParameters,
 							   const TArray<FString>& InFiles, TArray<FString>& OutResults,
@@ -60,5 +63,10 @@ public:
 					 TArray<FString>& OutErrorMessages) override
 	{
 		return false;
+	}
+
+	bool ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors) override
+	{
+		return true;
 	}
 };

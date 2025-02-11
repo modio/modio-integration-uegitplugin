@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Containers/UnrealString.h"
+#include "GitLockProviderSettings.h"
 #include "HAL/CriticalSection.h"
 
 class GITSOURCECONTROL_API FGitSourceControlSettings
@@ -31,6 +32,8 @@ public:
 
 	const TSoftClassPtr<class UGitLockProviderBase> GetLockProviderClass() const;
 
+	const FGitLockProviderSettings& GetLockProviderSettings() const;
+
 	/** Load settings from ini file */
 	void LoadSettings();
 
@@ -54,4 +57,6 @@ private:
 	FString LfsUserName;
 
 	TSoftClassPtr<class UGitLockProviderBase> LockProviderClass;
+
+	FGitLockProviderSettings CurrentLockProviderSettings;
 };

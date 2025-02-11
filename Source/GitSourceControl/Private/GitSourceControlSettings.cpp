@@ -13,6 +13,7 @@ namespace GitSettingsConstants
 
 	/** The section of the ini file we load our settings from */
 	static const FString SettingsSection = TEXT("GitSourceControl.GitSourceControlSettings");
+	static const FString LockProviderSettingsSection = TEXT("GitSourceControl.LockProviderSettings");
 
 } // namespace GitSettingsConstants
 
@@ -71,6 +72,11 @@ const TSoftClassPtr<class UGitLockProviderBase> FGitSourceControlSettings::GetLo
 	return LockProviderClass;
 }
 
+const FGitLockProviderSettings& FGitSourceControlSettings::GetLockProviderSettings() const
+{
+	return CurrentLockProviderSettings;
+}
+
 bool FGitSourceControlSettings::SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider)
 {
 	LockProviderClass = Provider;
@@ -93,6 +99,15 @@ void FGitSourceControlSettings::LoadSettings()
 		LockProviderClassPath = TEXT("/Game/Blah/DefaultLockProvider");
 	}
 	LockProviderClass = TSoftClassPtr<class UGitLockProviderBase> {LockProviderClassPath};
+	FConfigSection* LockProviderSettings =
+		GConfig->GetSectionPrivate(*GitSettingsConstants::LockProviderSettingsSection, false, true, IniFile);
+	if (LockProviderSettings)
+	{
+		for (const auto& Value : *LockProviderSettings)
+		{
+			CurrentLockProviderSettings.SettingValues.Add(Value.Key.ToString(), Value.Value.GetValue());
+		}
+	}
 }
 
 void FGitSourceControlSettings::SaveSettings() const
@@ -104,4 +119,12 @@ void FGitSourceControlSettings::SaveSettings() const
 	GConfig->SetString(*GitSettingsConstants::SettingsSection, TEXT("LfsUserName"), *LfsUserName, IniFile);
 	GConfig->SetString(*GitSettingsConstants::SettingsSection, TEXT("LockProviderClass"), *LockProviderClass.ToString(),
 					   IniFile);
+	FConfigSection* LockProviderSettings =
+		GConfig->GetSectionPrivate(*GitSettingsConstants::LockProviderSettingsSection, true, false, IniFile);
+	{
+		for (const auto& Value : CurrentLockProviderSettings.SettingValues)
+		{
+			LockProviderSettings->Add(FName(Value.Key), Value.Value);
+		}
+	}
 }
