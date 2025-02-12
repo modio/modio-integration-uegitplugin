@@ -21,7 +21,7 @@ TSharedRef<IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::GetLocksReques
 	FHttpModule& HttpModule = FHttpModule::Get();
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = HttpModule.CreateRequest();
-	FString RequestURL = FString("ServerIP") + TEXT("/api/FileLock/lock");
+	FString RequestURL = ServerAddress + TEXT("/api/FileLock/lock");
 	Request->SetVerb(TEXT("GET"));
 	Request->SetURL(RequestURL);
 	return Request;
@@ -34,7 +34,7 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::LockFile
 	FHttpModule& HttpModule = FHttpModule::Get();
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = HttpModule.CreateRequest();
-	FString RequestURL = FString("ServerIP") + TEXT("/api/FileLock/lock");
+	FString RequestURL = ServerAddress + TEXT("/api/FileLock/lock");
 	Request->SetVerb(TEXT("POST"));
 	Request->SetURL(RequestURL);
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
@@ -52,7 +52,7 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::UnlockFi
 	FHttpModule& HttpModule = FHttpModule::Get();
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = HttpModule.CreateRequest();
-	FString RequestURL = FString("ServerIP") + TEXT("/api/FileLock/lock");
+	FString RequestURL = ServerAddress + TEXT("/api/FileLock/lock");
 	Request->SetVerb(TEXT("DELETE"));
 	Request->SetURL(RequestURL);
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
@@ -66,10 +66,11 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::UnlockFi
 TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request)
 {
 	TUnion<FString, int32> Result;
-	bool bRequestDone = false;
+	Result.SetSubtype<int32>(-1);
+	volatile bool bRequestDone = false;
 	Request->OnProcessRequestComplete().BindLambda(
 		[&](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully) {
-			if (bConnectedSuccessfully)
+			if (Response->GetResponseCode() == 200)
 			{
 				Result.SetSubtype<FString>(Response->GetContentAsString());
 			}
@@ -77,6 +78,7 @@ TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRe
 			{
 				Result.SetSubtype<int32>(Response->GetResponseCode());
 			}
+			bRequestDone = true;
 		});
 	Request->ProcessRequest();
 	while (!bRequestDone)
@@ -116,15 +118,18 @@ TArray<TSharedPtr<FJsonValue>> UModioLockProvider::GetResponseAsJsonArray(const 
 
 void UModioLockProvider::YieldThread()
 {
-	FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+	/*if (FTaskGraphInterface::Get().GetCurrentThread() == ENamedThreads::GameThread)
+	{
+		FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
 #if UE_VERSION_OLDER_THAN(5, 3, 0)
-	FTicker::GetCoreTicker().Tick(FApp::GetDeltaTime());
+		FTicker::GetCoreTicker().Tick(FApp::GetDeltaTime());
 #else
-	FTSTicker::GetCoreTicker().Tick(FApp::GetDeltaTime());
+		FTSTicker::GetCoreTicker().Tick(FApp::GetDeltaTime());
 #endif
-	FSlateApplication::Get().PumpMessages();
-	FSlateApplication::Get().Tick();
-	FPlatformProcess::Sleep(0);
+		FSlateApplication::Get().PumpMessages();
+		FSlateApplication::Get().Tick();
+		FPlatformProcess::Sleep(0);
+	}*/
 }
 
 bool UModioLockProvider::RunLFSCommand(const FString& InCommand, const FString& InRepositoryRoot,
@@ -147,9 +152,9 @@ bool UModioLockProvider::GetLockedFiles(const FString& InRepositoryRoot, const F
 		for (const auto& Element : ResponseJSON)
 		{
 			const TSharedPtr<FJsonObject>& ElementAsObject = Element->AsObject();
-			OutResults.Add(FString::Format(TEXT("{0}\t{1}\t{2}"), {ElementAsObject->GetStringField("username"),
-																   ElementAsObject->GetStringField("assetPath"),
-																   ElementAsObject->GetStringField("projectName")}));
+			OutResults.Add(FString::Format(TEXT("{0}\t{1}\t{2}"), {ElementAsObject->GetStringField("assetPath"),
+																   ElementAsObject->GetStringField("username"),
+																   ElementAsObject->GetStringField("id")}));
 			// deserialize here
 		}
 		return true;
@@ -204,8 +209,10 @@ bool UModioLockProvider::ConfigureWithSettings(const FGitLockProviderSettings& N
 	{
 		if (NewSettings.SettingValues.Contains("ServerPort"))
 		{
-			ServerAddress = FString::Format(TEXT("https://{0}:{1}"), {NewSettings.SettingValues["ServerAddress"],
-																	  NewSettings.SettingValues["ServerPort"]});
+			ServerAddress =
+				FString::Format(TEXT("https://{0}:{1}"), {NewSettings.SettingValues["ServerAddress"].TrimStartAndEnd(),
+														  NewSettings.SettingValues["ServerPort"].TrimStartAndEnd()})
+					.TrimStartAndEnd();
 			return true;
 		}
 		else

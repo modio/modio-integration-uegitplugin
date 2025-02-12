@@ -81,6 +81,10 @@ void SGitSourceControlSettings::NotifyPostChange(const FPropertyChangedEvent& Pr
 				.Error(FText::FromString(
 					FString::Format(TEXT("Lock Provider Settings validation failure: {0}"), {*CurrentError})));
 		}
+		if (!OutErrors.Num())
+		{
+			GitSourceControl.SaveSettings();
+		}
 	}
 }
 

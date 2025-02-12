@@ -96,7 +96,7 @@ void FGitSourceControlSettings::LoadSettings()
 					   IniFile);
 	if (LockProviderClassPath.IsEmpty())
 	{
-		LockProviderClassPath = TEXT("/Game/Blah/DefaultLockProvider");
+		LockProviderClassPath = TEXT("/Script/GitSourceControl.LFSLockProvider");
 	}
 	LockProviderClass = TSoftClassPtr<class UGitLockProviderBase> {LockProviderClassPath};
 	FConfigSection* LockProviderSettings =
@@ -127,4 +127,5 @@ void FGitSourceControlSettings::SaveSettings() const
 			LockProviderSettings->Add(FName(Value.Key), Value.Value);
 		}
 	}
+	GConfig->Flush(false, IniFile);
 }
