@@ -6,7 +6,9 @@
 #pragma once
 
 #include "ISourceControlProvider.h"
+#include "Misc/NotifyHook.h"
 #include "Runtime/Launch/Resources/Version.h"
+#include "UObject/StructOnScope.h"
 #include "Widgets/SCompoundWidget.h"
 
 class SNotificationItem;
@@ -24,12 +26,14 @@ namespace ETextCommit
 
 enum class ECheckBoxState : uint8;
 
-class SGitSourceControlSettings : public SCompoundWidget
+class SGitSourceControlSettings : public SCompoundWidget, public FNotifyHook
 {
 public:
 	SLATE_BEGIN_ARGS(SGitSourceControlSettings) {}
 
 	SLATE_END_ARGS()
+
+	void NotifyPostChange(const FPropertyChangedEvent& PropertyChangedEvent, FProperty* PropertyThatChanged) override;
 
 public:
 	void Construct(const FArguments& InArgs);
@@ -99,7 +103,8 @@ private:
 
 	/** Asynchronous operation progress notifications */
 	TWeakPtr<SNotificationItem> OperationInProgressNotification;
-
+	TSharedRef<SWidget> ConstructLockProviderSettingsWidget();
+	TSharedPtr<FStructOnScope> LockProviderSettings;
 	void DisplayInProgressNotification(const FSourceControlOperationRef& InOperation);
 	void RemoveInProgressNotification();
 	void DisplaySuccessNotification(const FSourceControlOperationRef& InOperation);

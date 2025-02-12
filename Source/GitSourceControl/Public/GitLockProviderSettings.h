@@ -10,12 +10,11 @@
 
 #include "GitLockProviderSettings.generated.h"
 
-
 USTRUCT()
 struct FGitLockProviderSettings
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	TMap<FString, FString> SettingValues;
 };

@@ -8,10 +8,19 @@
 #include "EditorDirectories.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Framework/Notifications/NotificationManager.h"
+#include "GitLockProviderSettings.h"
+#include "GitSourceControlModule.h"
+#include "GitSourceControlUtils.h"
+#include "IGitLockProvider.h"
+#include "ISourceControlModule.h"
+#include "IStructureDetailsView.h"
+#include "LFSLockProvider.h"
+#include "Logging/MessageLog.h"
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
+#include "PropertyCustomizationHelpers.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -25,14 +34,55 @@
 #else
 	#include "EditorStyleSet.h"
 #endif
-#include "GitSourceControlModule.h"
-#include "GitSourceControlUtils.h"
-#include "IGitLockProvider.h"
-#include "LFSLockProvider.h"
-#include "PropertyCustomizationHelpers.h"
 #include "SourceControlOperations.h"
 
 #define LOCTEXT_NAMESPACE "SGitSourceControlSettings"
+
+TSharedRef<SWidget> SGitSourceControlSettings::ConstructLockProviderSettingsWidget()
+{
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
+
+	LockProviderSettings =
+		MakeShared<FStructOnScope>(FGitLockProviderSettings::StaticStruct(),
+								   (uint8*) &GitSourceControl.AccessSettings().GetLockProviderSettings())
+			.ToSharedPtr();
+	FDetailsViewArgs DetailArgs;
+	DetailArgs.bUpdatesFromSelection = false;
+	DetailArgs.bLockable = false;
+	DetailArgs.NameAreaSettings = FDetailsViewArgs::ComponentsAndActorsUseNameArea;
+	DetailArgs.bCustomNameAreaLocation = false;
+	DetailArgs.bCustomFilterAreaLocation = false;
+	DetailArgs.bShowOptions = false;
+	DetailArgs.bAllowSearch = false;
+	DetailArgs.DefaultsOnlyVisibility = EEditDefaultsOnlyNodeVisibility::Show;
+	DetailArgs.bForceHiddenPropertyVisibility = true;
+
+	DetailArgs.NotifyHook = this;
+
+	return PropertyModule
+		.CreateStructureDetailView(DetailArgs, {}, LockProviderSettings, FText::FromString("Lock Provider Settings"))
+		->GetWidget()
+		.ToSharedRef();
+}
+
+void SGitSourceControlSettings::NotifyPostChange(const FPropertyChangedEvent& PropertyChangedEvent,
+												 FProperty* PropertyThatChanged)
+{
+	if (PropertyChangedEvent.GetPropertyName() == FName("SettingValues"))
+	{
+		FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
+		TArray<FString> OutErrors;
+		GitSourceControl.GetLockProvider()->ConfigureWithSettings(
+			GitSourceControl.AccessSettings().GetLockProviderSettings(), OutErrors);
+		for (const FString& CurrentError : OutErrors)
+		{
+			FMessageLog("SourceControl")
+				.Error(FText::FromString(
+					FString::Format(TEXT("Lock Provider Settings validation failure: {0}"), {*CurrentError})));
+		}
+	}
+}
 
 void SGitSourceControlSettings::Construct(const FArguments& InArgs)
 {
@@ -557,6 +607,11 @@ void SGitSourceControlSettings::ConstructBasedOnEngineVersion( )
 				.SelectedClass(this, &Self::GetLockProviderClass)
 				.OnSetClass(this, &Self::SetLockProviderClass)
 			]
+		] +
+		 SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			ConstructLockProviderSettingsWidget()
 		]
 		// [Optional] Initial Git Commit
 		+SVerticalBox::Slot()

@@ -25,6 +25,7 @@
 #include "GitSourceControlUtils.h"
 #include "ISourceControlModule.h"
 #include "LFSLockProvider.h"
+#include "Logging/MessageLog.h"
 #include "Misc/ConfigCacheIni.h"
 #include "SourceControlHelpers.h"
 
@@ -159,12 +160,18 @@ void FGitSourceControlModule::UpdateLockProviderInstance()
 	TSoftClassPtr<UGitLockProviderBase> LockProviderClassPtr = GitSourceControlSettings.GetLockProviderClass();
 	if (LockProviderClassPtr.IsValid())
 	{
-		LockProviderClassPtr.LoadSynchronous();
+		LockProviderClass = LockProviderClassPtr.LoadSynchronous();
 	}
 
 	LockProvider.Reset(NewObject<UGitLockProviderBase>(GetTransientPackage(), LockProviderClass));
 	TArray<FString> Errors;
 	LockProvider->ConfigureWithSettings(GitSourceControlSettings.GetLockProviderSettings(), Errors);
+	for (const FString& CurrentError : Errors)
+	{
+		FMessageLog("SourceControl")
+			.Error(FText::FromString(
+				FString::Format(TEXT("Lock Provider Settings validation failure:{0}"), {*CurrentError})));
+	}
 }
 
 void FGitSourceControlModule::ShutdownModule()
