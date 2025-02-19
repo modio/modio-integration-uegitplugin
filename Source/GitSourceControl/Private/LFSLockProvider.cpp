@@ -57,3 +57,31 @@ bool ULFSLockProvider::UnlockFiles(const FString& InRepositoryRoot, const FGitFi
 	return RunLFSCommand(TEXT("unlock"), InRepositoryRoot, Params.GitBinaryPath, Params.CustomParams, Params.FileNames,
 						 OutResults, OutErrorMessages);
 }
+
+bool ULFSLockProvider::CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
+											   const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
+											   TArray<FString>& OutErrorMessages)
+{
+	TArray<FString> Results;
+	TArray<FString> Parameters;
+	Parameters.Add(TEXT("lockable")); // follow file renames
+
+	const bool bResults = GitSourceControlUtils::RunCommand(TEXT("check-attr"), InPathToGitBinary, InRepositoryRoot,
+															Parameters, InFiles, Results, OutErrorMessages);
+	if (!bResults)
+	{
+		return false;
+	}
+
+	for (int i = 0; i < InFiles.Num(); i++)
+	{
+		const FString& Result = Results[i];
+		if (Result.EndsWith("set") && !Result.EndsWith("unset"))
+		{
+			const FString FileExt = InFiles[i].RightChop(1); // Remove wildcard (*)
+			OutLockableExtensions.Add(FileExt);
+		}
+	}
+
+	return true;
+}

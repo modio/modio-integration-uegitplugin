@@ -4,8 +4,11 @@
 #include "Async/TaskGraphInterfaces.h"
 #include "Containers/Ticker.h"
 #include "Framework/Application/SlateApplication.h"
+#include "GenericPlatform/GenericPlatformHttp.h"
+#include "GitMessageLog.h"
 #include "GitSourceControlModule.h"
 #include "HAL/PlatformProcess.h"
+#include "HttpManager.h"
 #include "HttpModule.h"
 #include "ISourceControlModule.h"
 #include "Interfaces/IHttpRequest.h"
@@ -39,7 +42,7 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::LockFile
 	Request->SetURL(RequestURL);
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 	FString RequestContent = FString::Format(TEXT("{\"username\": \"{0}\", \"assetPath\": \"{1}\", \"projectName\": "
-												  "\"{2}\", \"bCreateProject\": \"true\" }"),
+												  "\"{2}\", \"bCreateProject\": true }"),
 											 {*Username, *FilePath, *ProjectName});
 	Request->SetContentAsString(RequestContent);
 	return Request;
@@ -67,9 +70,18 @@ TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRe
 {
 	TUnion<FString, int32> Result;
 	Result.SetSubtype<int32>(-1);
-	volatile bool bRequestDone = false;
 	Request->OnProcessRequestComplete().BindLambda(
-		[&](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully) {
+		[&Result](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully) {
+			// need to check validity of request and response here
+			if (!Request.IsValid() || !Response.IsValid())
+			{
+				Result.SetSubtype<int32>(404);
+				return;
+			}
+			FTSMessageLog("SourceControl")
+				.Info(FText::FromString(
+					FString::Format(TEXT("Request {0} {1} received response code {2}"),
+									{Request->GetVerb(), *Request->GetURL(), Response->GetResponseCode()})));
 			if (Response->GetResponseCode() == 200)
 			{
 				Result.SetSubtype<FString>(Response->GetContentAsString());
@@ -78,13 +90,14 @@ TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRe
 			{
 				Result.SetSubtype<int32>(Response->GetResponseCode());
 			}
-			bRequestDone = true;
 		});
 	Request->ProcessRequest();
-	while (!bRequestDone)
+	while (Request->GetStatus() == EHttpRequestStatus::Processing)
 	{
-		YieldThread();
+		FPlatformProcess::Sleep(0.01f);
 	}
+	// synchronous event from task pool
+
 	return Result;
 }
 
@@ -225,4 +238,18 @@ bool UModioLockProvider::ConfigureWithSettings(const FGitLockProviderSettings& N
 		OutErrors.Add("ServerAddress setting missing");
 	}
 	return false;
+}
+
+bool UModioLockProvider::CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
+												 const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
+												 TArray<FString>& OutErrorMessages)
+{
+	for (const FString& Extension : InFiles)
+	{
+		if (Extension.StartsWith(TEXT("*")))
+		{
+			OutLockableExtensions.Add(Extension.Mid(1));
+		}
+	}
+	return true;
 }

@@ -33,6 +33,9 @@ public:
 						   TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) = 0;
 	virtual bool UnlockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
 							 TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) = 0;
+	virtual bool CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
+										 const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
+										 TArray<FString>& OutErrorMessages) = 0;
 };
 
 UCLASS(Abstract)
@@ -66,6 +69,13 @@ public:
 	}
 
 	bool ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors) override
+	{
+		return true;
+	}
+
+	bool CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
+								 const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
+								 TArray<FString>& OutErrorMessages) override
 	{
 		return true;
 	}

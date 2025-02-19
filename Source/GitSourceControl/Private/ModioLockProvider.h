@@ -48,4 +48,8 @@ public:
 					 TArray<FString>& OutErrorMessages) override;
 
 	bool ConfigureWithSettings(const FGitLockProviderSettings& NewSettings, TArray<FString>& OutErrors) override;
+
+	bool CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
+								 const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
+								 TArray<FString>& OutErrorMessages) override;
 };

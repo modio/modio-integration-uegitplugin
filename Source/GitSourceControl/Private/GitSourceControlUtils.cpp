@@ -2461,28 +2461,9 @@ namespace GitSourceControlUtils
 	bool CheckLFSLockable(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
 						  const TArray<FString>& InFiles, TArray<FString>& OutErrorMessages)
 	{
-		TArray<FString> Results;
-		TArray<FString> Parameters;
-		Parameters.Add(TEXT("lockable")); // follow file renames
-
-		const bool bResults = RunCommand(TEXT("check-attr"), InPathToGitBinary, InRepositoryRoot, Parameters, InFiles,
-										 Results, OutErrorMessages);
-		if (!bResults)
-		{
-			return false;
-		}
-
-		for (int i = 0; i < InFiles.Num(); i++)
-		{
-			const FString& Result = Results[i];
-			if (Result.EndsWith("set") && !Result.EndsWith("unset"))
-			{
-				const FString FileExt = InFiles[i].RightChop(1); // Remove wildcard (*)
-				LockableTypes.Add(FileExt);
-			}
-		}
-
-		return true;
+		FGitSourceControlModule& GitSourceControl = FGitSourceControlModule::Get();
+		return GitSourceControl.GetLockProvider()->CheckLockableExtensions(InPathToGitBinary, InRepositoryRoot, InFiles,
+																		   LockableTypes, OutErrorMessages);
 	}
 
 	bool FetchRemote(const FString& InPathToGitBinary, const FString& InPathToRepositoryRoot, bool InUsingGitLfsLocking,
