@@ -55,14 +55,11 @@ TSharedRef<class IHttpRequest, ESPMode::ThreadSafe> UModioLockProvider::UnlockFi
 	FHttpModule& HttpModule = FHttpModule::Get();
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = HttpModule.CreateRequest();
-	FString RequestURL = ServerAddress + TEXT("/api/FileLock/lock");
+	FString RequestURL =
+		ServerAddress + FString::Format(TEXT("/api/FileLock/lock?username={0}&assetPath={1}&projectName={2}"),
+										{*Username, *FGenericPlatformHttp::UrlEncode(FilePath), *ProjectName});
 	Request->SetVerb(TEXT("DELETE"));
 	Request->SetURL(RequestURL);
-	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	FString RequestContent = FString::Format(TEXT("{\"username\": \"{0}\", \"assetPath\": \"{1}\", \"projectName\": "
-												  "\"{2}\" }"),
-											 {*Username, *FilePath, *ProjectName});
-	Request->SetContentAsString(RequestContent);
 	return Request;
 }
 
@@ -70,6 +67,7 @@ TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRe
 {
 	TUnion<FString, int32> Result;
 	Result.SetSubtype<int32>(-1);
+	Request->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnHttpThread);
 	Request->OnProcessRequestComplete().BindLambda(
 		[&Result](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully) {
 			// need to check validity of request and response here
@@ -92,9 +90,13 @@ TUnion<FString, int32> UModioLockProvider::PerformHttpRequest(TSharedRef<IHttpRe
 			}
 		});
 	Request->ProcessRequest();
+	double LastTime = FPlatformTime::Seconds();
 	while (Request->GetStatus() == EHttpRequestStatus::Processing)
 	{
-		FPlatformProcess::Sleep(0.01f);
+		// const double AppTime = FPlatformTime::Seconds();
+		// FHttpModule::Get().GetHttpManager().Tick(AppTime - LastTime);
+		// LastTime = AppTime;
+		FPlatformProcess::Sleep(0.1f);
 	}
 	// synchronous event from task pool
 
