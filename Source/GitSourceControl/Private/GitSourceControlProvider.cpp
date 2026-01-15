@@ -636,6 +636,21 @@ void FGitSourceControlProvider::UpdateRepositoryStatus(const class FGitSourceCon
 	}
 }
 
+#if UE_VERSION_NEWER_THAN_OR_EQUAL(5, 7, 0)
+bool FGitSourceControlProvider::GetStateBranchAtIndex(int32 BranchIndex, FString& OutBranchName) const
+{
+	TArray<FString> StatusBranches = GetStatusBranchNames();
+
+	if (BranchIndex >= 0 && BranchIndex < StatusBranches.Num())
+	{
+		OutBranchName = StatusBranches[BranchIndex];
+		return true;
+	}
+
+	return false;
+}
+#endif
+
 void FGitSourceControlProvider::Tick()
 {
 #if ENGINE_MAJOR_VERSION < 5
