@@ -90,7 +90,7 @@ public:
 	virtual bool CanExecuteOperation( const FSourceControlOperationRef& InOperation ) const override;
 	virtual TMap<EStatus, FString> GetStatus() const override;
 #endif
-#if UE_VERSION_NEWER_THAN_OR_EQUAL(5, 7, 0)
+#if !UE_VERSION_OLDER_THAN(5, 7, 0)
 	virtual bool GetStateBranchAtIndex(int32 BranchIndex, FString& OutBranchName) const override;
 #endif
 	virtual void Tick() override;

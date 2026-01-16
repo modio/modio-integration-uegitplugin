@@ -636,7 +636,7 @@ void FGitSourceControlProvider::UpdateRepositoryStatus(const class FGitSourceCon
 	}
 }
 
-#if UE_VERSION_NEWER_THAN_OR_EQUAL(5, 7, 0)
+#if !UE_VERSION_OLDER_THAN(5, 7, 0)
 bool FGitSourceControlProvider::GetStateBranchAtIndex(int32 BranchIndex, FString& OutBranchName) const
 {
 	TArray<FString> StatusBranches = GetStatusBranchNames();
