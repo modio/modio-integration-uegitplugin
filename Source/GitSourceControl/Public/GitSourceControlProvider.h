@@ -9,6 +9,7 @@
 #include "ISourceControlProvider.h"
 #include "IGitSourceControlWorker.h"
 #include "GitSourceControlMenu.h"
+#include "Misc/EngineVersionComparison.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 class FGitSourceControlChangelistState;
@@ -88,6 +89,9 @@ public:
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 	virtual bool CanExecuteOperation( const FSourceControlOperationRef& InOperation ) const override;
 	virtual TMap<EStatus, FString> GetStatus() const override;
+#endif
+#if !UE_VERSION_OLDER_THAN(5, 7, 0)
+	virtual bool GetStateBranchAtIndex(int32 BranchIndex, FString& OutBranchName) const override;
 #endif
 	virtual void Tick() override;
 	virtual TArray< TSharedRef<class ISourceControlLabel> > GetLabels( const FString& InMatchingSpec ) const override;
