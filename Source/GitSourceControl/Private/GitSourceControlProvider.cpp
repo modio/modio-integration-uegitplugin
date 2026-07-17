@@ -557,7 +557,7 @@ TOptional<int> FGitSourceControlProvider::GetNumLocalChanges() const
 {
 	return TOptional<int>();
 }
-#elif ENGINE_MINOR_VERSION >= 8
+#elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
 bool FGitSourceControlProvider::UsesFileRevisions() const
 {
 	return false;

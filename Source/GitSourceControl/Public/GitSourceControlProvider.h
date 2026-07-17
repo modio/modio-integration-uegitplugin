@@ -80,7 +80,7 @@ public:
 	virtual bool UsesFileRevisions() const override;
 	virtual TOptional<bool> IsAtLatestRevision() const override;
 	virtual TOptional<int> GetNumLocalChanges() const override;
-#elif ENGINE_MINOR_VERSION >= 8
+#elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
 	virtual bool UsesFileRevisions() const override;
 	virtual bool UsesSoftRevertOnDelete() const override;
 	virtual TOptional<bool> HasChangesToSync() const override;
