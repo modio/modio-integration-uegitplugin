@@ -542,7 +542,7 @@ bool FGitSourceControlProvider::UsesCheckout() const
 	return bUsingGitLfsLocking; // Git LFS Lock uses read-only state
 }
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1 && ENGINE_MINOR_VERSION <= 7
 bool FGitSourceControlProvider::UsesFileRevisions() const
 {
 	return true;
@@ -556,6 +556,23 @@ TOptional<bool> FGitSourceControlProvider::IsAtLatestRevision() const
 TOptional<int> FGitSourceControlProvider::GetNumLocalChanges() const
 {
 	return TOptional<int>();
+}
+#elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 8
+bool FGitSourceControlProvider::UsesFileRevisions() const
+{
+	return false;
+}
+bool FGitSourceControlProvider::UsesSoftRevertOnDelete() const
+{
+	return false;
+}
+TOptional<bool> FGitSourceControlProvider::HasChangesToSync() const
+{
+	return false;
+}
+TOptional<bool> FGitSourceControlProvider::HasChangesToCheckIn() const
+{
+	return false;
 }
 #endif
 
