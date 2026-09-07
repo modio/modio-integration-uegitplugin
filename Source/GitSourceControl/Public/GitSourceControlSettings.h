@@ -6,13 +6,14 @@
 #pragma once
 
 #include "Containers/UnrealString.h"
+#include "GitLockProviderSettings.h"
 #include "HAL/CriticalSection.h"
 
 class GITSOURCECONTROL_API FGitSourceControlSettings
 {
 public:
 	/** Get the Git Binary Path */
-	const FString & GetBinaryPath() const;
+	const FString& GetBinaryPath() const;
 
 	/** Set the Git Binary Path */
 	bool SetBinaryPath(const FString& InString);
@@ -29,6 +30,10 @@ public:
 	/** Set the username used by the Git LFS 2 File Locks server */
 	bool SetLfsUserName(const FString& InString);
 
+	const TSoftClassPtr<class UGitLockProviderBase> GetLockProviderClass() const;
+
+	const FGitLockProviderSettings& GetLockProviderSettings() const;
+
 	/** Load settings from ini file */
 	void LoadSettings();
 
@@ -36,6 +41,9 @@ public:
 	void SaveSettings() const;
 
 private:
+	friend class FGitSourceControlModule;
+	bool SetLockProviderClass(TSoftClassPtr<class UGitLockProviderBase> Provider);
+
 	/** A critical section for settings access */
 	mutable FCriticalSection CriticalSection;
 
@@ -47,4 +55,8 @@ private:
 
 	/** Username used by the Git LFS 2 File Locks server */
 	FString LfsUserName;
+
+	TSoftClassPtr<class UGitLockProviderBase> LockProviderClass;
+
+	FGitLockProviderSettings CurrentLockProviderSettings;
 };
