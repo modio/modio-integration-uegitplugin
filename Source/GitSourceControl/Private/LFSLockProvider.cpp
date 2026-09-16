@@ -45,17 +45,30 @@ bool ULFSLockProvider::GetLockedFiles(const FString& InRepositoryRoot, const FGi
 }
 
 bool ULFSLockProvider::LockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
-								 TArray<FString>& OutResults, TArray<FString>& OutErrorMessages)
+								 TArray<FString>& OutSucceededFiles, TArray<FString>& OutResults,
+								 TArray<FString>& OutErrorMessages)
 {
-	return RunLFSCommand(TEXT("lock"), InRepositoryRoot, Params.GitBinaryPath, Params.CustomParams, Params.FileNames,
-						 OutResults, OutErrorMessages);
+	const bool bSuccess = RunLFSCommand(TEXT("lock"), InRepositoryRoot, Params.GitBinaryPath, Params.CustomParams,
+										Params.FileNames, OutResults, OutErrorMessages);
+	// git-lfs locks the whole invocation or none of it, so there is no partial outcome to report.
+	if (bSuccess)
+	{
+		OutSucceededFiles.Append(Params.FileNames);
+	}
+	return bSuccess;
 }
 
 bool ULFSLockProvider::UnlockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
-								   TArray<FString>& OutResults, TArray<FString>& OutErrorMessages)
+								   TArray<FString>& OutSucceededFiles, TArray<FString>& OutResults,
+								   TArray<FString>& OutErrorMessages)
 {
-	return RunLFSCommand(TEXT("unlock"), InRepositoryRoot, Params.GitBinaryPath, Params.CustomParams, Params.FileNames,
-						 OutResults, OutErrorMessages);
+	const bool bSuccess = RunLFSCommand(TEXT("unlock"), InRepositoryRoot, Params.GitBinaryPath, Params.CustomParams,
+										Params.FileNames, OutResults, OutErrorMessages);
+	if (bSuccess)
+	{
+		OutSucceededFiles.Append(Params.FileNames);
+	}
+	return bSuccess;
 }
 
 bool ULFSLockProvider::CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,

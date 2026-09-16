@@ -28,6 +28,30 @@
 
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
+namespace GitSourceControlOperationsHelpers
+{
+	//Drops the cached lock entries for the files a provider actually released.
+	static void ForgetReleasedLocks(const FString& InPathToGitRoot, const TArray<FString>& InLockedAbsoluteFiles,
+									const TArray<FString>& InReleasedRelativeFiles)
+	{
+		if (InReleasedRelativeFiles.Num() == 0)
+		{
+			return;
+		}
+
+		const TSet<FString> ReleasedFiles(InReleasedRelativeFiles);
+		for (const FString& AbsoluteFile : InLockedAbsoluteFiles)
+		{
+			const TArray<FString> RelativeFile =
+				GitSourceControlUtils::RelativeFilenames({AbsoluteFile}, InPathToGitRoot);
+			if (RelativeFile.Num() == 1 && ReleasedFiles.Contains(RelativeFile[0]))
+			{
+				FGitLockedFilesCache::RemoveLockedFile(AbsoluteFile);
+			}
+		}
+	}
+} // namespace GitSourceControlOperationsHelpers
+
 FName FGitConnectWorker::GetName() const
 {
 	return "Connect";
@@ -130,24 +154,30 @@ bool FGitCheckOutWorker::Execute(FGitSourceControlCommand& InCommand)
 		InCommand.bCommandSuccessful = true;
 		return InCommand.bCommandSuccessful;
 	}
+	// Locking can be a partial-success, some files can come back locked while others are held by someone
+	// else, so the provider reports which ones we actually hold.
+	TArray<FString> LockedRelativeFiles;
 	const bool bSuccess = FGitSourceControlModule::Get().GetLockProvider()->LockFiles(
 		InCommand.PathToGitRoot,
 		FGitFileLockOpParams {InCommand.PathToGitBinary, FGitSourceControlModule::GetEmptyStringArray(), false,
 							  LockableRelativeFiles},
-		InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
+		LockedRelativeFiles, InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
 	InCommand.bCommandSuccessful = bSuccess;
 	const FString& LockUser = FGitSourceControlModule::Get().GetProvider().GetLockUser();
-	if (bSuccess)
-	{
-		TArray<FString> AbsoluteFiles;
-		for (const auto& RelativeFile : RelativeFiles)
-		{
-			FString AbsoluteFile = FPaths::Combine(InCommand.PathToGitRoot, RelativeFile);
-			FGitLockedFilesCache::AddLockedFile(AbsoluteFile, LockUser);
-			FPaths::NormalizeFilename(AbsoluteFile);
-			AbsoluteFiles.Add(AbsoluteFile);
-		}
 
+	// Mark exactly the files the provider locked, not the whole selection
+	TArray<FString> AbsoluteFiles;
+	AbsoluteFiles.Reserve(LockedRelativeFiles.Num());
+	for (const auto& RelativeFile : LockedRelativeFiles)
+	{
+		FString AbsoluteFile = FPaths::Combine(InCommand.PathToGitRoot, RelativeFile);
+		FGitLockedFilesCache::AddLockedFile(AbsoluteFile, LockUser);
+		FPaths::NormalizeFilename(AbsoluteFile);
+		AbsoluteFiles.Add(AbsoluteFile);
+	}
+
+	if (AbsoluteFiles.Num() > 0)
+	{
 		GitSourceControlUtils::CollectNewStates(AbsoluteFiles, States, EFileState::Unset, ETreeState::Unset,
 												ELockState::Locked);
 		for (auto& State : States)
@@ -373,18 +403,15 @@ bool FGitCheckInWorker::Execute(FGitSourceControlCommand& InCommand)
 					if (FilesToUnlock.Num() > 0)
 					{
 						// Not strictly necessary to succeed, so don't update command success
-						const bool bUnlockSuccess = FGitSourceControlModule::Get().GetLockProvider()->UnlockFiles(
+						TArray<FString> UnlockedFiles;
+						FGitSourceControlModule::Get().GetLockProvider()->UnlockFiles(
 							InCommand.PathToGitRoot,
 							FGitFileLockOpParams {InCommand.PathToGitBinary,
 												  FGitSourceControlModule::GetEmptyStringArray(), false, FilesToUnlock},
-							InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
-						if (bUnlockSuccess)
-						{
-							for (const auto& File : LockedFiles)
-							{
-								FGitLockedFilesCache::RemoveLockedFile(File);
-							}
-						}
+							UnlockedFiles, InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
+						// Unlocking is partial-success too, so forget only the files actually released.
+						GitSourceControlOperationsHelpers::ForgetReleasedLocks(InCommand.PathToGitRoot, LockedFiles,
+																			   UnlockedFiles);
 					}
 				}
 #if 0
@@ -647,18 +674,15 @@ bool FGitRevertWorker::Execute(FGitSourceControlCommand& InCommand)
 		{
 			const TArray<FString>& RelativeFiles =
 				GitSourceControlUtils::RelativeFilenames(LockedFiles, InCommand.PathToGitRoot);
+			TArray<FString> UnlockedFiles;
 			InCommand.bCommandSuccessful &= FGitSourceControlModule::Get().GetLockProvider()->UnlockFiles(
 				InCommand.PathToGitRoot,
 				FGitFileLockOpParams {InCommand.PathToGitBinary, FGitSourceControlModule::GetEmptyStringArray(), false,
 									  RelativeFiles},
-				InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
-			if (InCommand.bCommandSuccessful)
-			{
-				for (const auto& File : LockedFiles)
-				{
-					FGitLockedFilesCache::RemoveLockedFile(File);
-				}
-			}
+				UnlockedFiles, InCommand.ResultInfo.InfoMessages, InCommand.ResultInfo.ErrorMessages);
+			// Forget only the files actually released, so a lock we failed to drop stays visible.
+			GitSourceControlOperationsHelpers::ForgetReleasedLocks(InCommand.PathToGitRoot, LockedFiles,
+																  UnlockedFiles);
 		}
 	}
 

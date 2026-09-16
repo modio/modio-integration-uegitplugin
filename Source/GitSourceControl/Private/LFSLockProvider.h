@@ -18,10 +18,12 @@ public:
 								TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
 
 	virtual bool LockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
-						   TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
+						   TArray<FString>& OutSucceededFiles, TArray<FString>& OutResults,
+						   TArray<FString>& OutErrorMessages) override;
 
 	virtual bool UnlockFiles(const FString& InRepositoryRoot, const FGitFileLockOpParams& Params,
-							 TArray<FString>& OutResults, TArray<FString>& OutErrorMessages) override;
+							 TArray<FString>& OutSucceededFiles, TArray<FString>& OutResults,
+							 TArray<FString>& OutErrorMessages) override;
 
 	bool CheckLockableExtensions(const FString& InPathToGitBinary, const FString& InRepositoryRoot,
 								 const TArray<FString>& InFiles, TArray<FString>& OutLockableExtensions,
