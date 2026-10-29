@@ -4,45 +4,21 @@
 // or copy at http://opensource.org/licenses/MIT)
 
 #include "GitSourceControlUtils.h"
+#include "CoreMinimal.h"
 
-#include "GitMessageLog.h"
-#include "GitSourceControlCommand.h"
-#include "GitSourceControlModule.h"
-#include "GitSourceControlProvider.h"
-#include "HAL/PlatformProcess.h"
-
-#include "HAL/PlatformFile.h"
-#if ENGINE_MAJOR_VERSION >= 5
-#include "HAL/PlatformFileManager.h"
+#if PLATFORM_MAC
+#define FVector FVectorWorkaround
+#import <AppKit/AppKit.h>
+#undef FVector
+#include "Misc/EngineVersionComparison.h"
+#if !UE_VERSION_NEWER_THAN(5, 8, 0)
 #else
-#include "HAL/PlatformFilemanager.h"
+#include "Apple/ScopeAutoreleasePool.h"
+#endif
 #endif
 
-#include "HAL/PlatformProcess.h"
-#include "Interfaces/IPluginManager.h"
-#include "ISourceControlModule.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "ISourceControlModule.h"
-#include "GitSourceControlModule.h"
-#include "GitSourceControlChangelistState.h"
-#include "Logging/MessageLog.h"
-#include "Misc/DateTime.h"
-#include "Misc/ScopeLock.h"
-#include "Misc/Timespan.h"
-
-#include "PackageTools.h"
-#include "FileHelpers.h"
-#include "Misc/MessageDialog.h"
-#include "UObject/ObjectSaveContext.h"
-
-#include "Async/Async.h"
-#include "UObject/Linker.h"
-
-#ifndef GIT_DEBUG_STATUS
-#define GIT_DEBUG_STATUS 0
-#endif
-
+#include "Internationalization/Text.h"
+#include "Internationalization/Internationalization.h"
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
 namespace GitSourceControlConstants
