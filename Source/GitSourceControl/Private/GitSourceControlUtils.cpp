@@ -43,6 +43,8 @@
 #define GIT_DEBUG_STATUS 0
 #endif
 
+#import <AppKit/AppKit.h>
+
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
 namespace GitSourceControlConstants
