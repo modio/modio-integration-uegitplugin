@@ -4,47 +4,11 @@
 // or copy at http://opensource.org/licenses/MIT)
 
 #include "GitSourceControlUtils.h"
-
-#include "GitMessageLog.h"
-#include "GitSourceControlCommand.h"
-#include "GitSourceControlModule.h"
-#include "GitSourceControlProvider.h"
-#include "HAL/PlatformProcess.h"
-
-#include "HAL/PlatformFile.h"
-#if ENGINE_MAJOR_VERSION >= 5
-#include "HAL/PlatformFileManager.h"
-#else
-#include "HAL/PlatformFilemanager.h"
-#endif
-
-#include "HAL/PlatformProcess.h"
-#include "Interfaces/IPluginManager.h"
-#include "ISourceControlModule.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "ISourceControlModule.h"
-#include "GitSourceControlModule.h"
-#include "GitSourceControlChangelistState.h"
-#include "Logging/MessageLog.h"
-#include "Misc/DateTime.h"
-#include "Misc/ScopeLock.h"
-#include "Misc/Timespan.h"
-
-#include "PackageTools.h"
-#include "FileHelpers.h"
-#include "Misc/MessageDialog.h"
-#include "UObject/ObjectSaveContext.h"
-
-#include "Async/Async.h"
-#include "UObject/Linker.h"
-
-#ifndef GIT_DEBUG_STATUS
-#define GIT_DEBUG_STATUS 0
-#endif
-
 #import <AppKit/AppKit.h>
+#include "CoreMinimal.h"
 
+#include "Internationalization/Text.h"
+#include "Internationalization/Internationalization.h"
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
 namespace GitSourceControlConstants
