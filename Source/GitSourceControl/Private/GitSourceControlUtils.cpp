@@ -4,14 +4,17 @@
 // or copy at http://opensource.org/licenses/MIT)
 
 #include "GitSourceControlUtils.h"
+#include "CoreMinimal.h"
+
+#if PLATFORM_MAC
 #define FVector FVectorWorkaround
 #import <AppKit/AppKit.h>
 #undef FVector
 #include "Misc/EngineVersionComparison.h"
-#include "CoreMinimal.h"
 #if !UE_VERSION_NEWER_THAN(5, 8, 0)
 #else
 #include "Apple/ScopeAutoreleasePool.h"
+#endif
 #endif
 
 #include "Internationalization/Text.h"
