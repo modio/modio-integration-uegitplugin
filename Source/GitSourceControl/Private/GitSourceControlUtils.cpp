@@ -8,7 +8,7 @@
 #import <AppKit/AppKit.h>
 #undef FVector
 #include "CoreMinimal.h"
-#include "Apple/ApplePlatformMemory.h"
+#include "Apple/ApplePlatformMisc.h"
 
 #include "Internationalization/Text.h"
 #include "Internationalization/Internationalization.h"
