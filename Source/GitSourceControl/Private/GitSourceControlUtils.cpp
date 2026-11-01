@@ -4,7 +4,9 @@
 // or copy at http://opensource.org/licenses/MIT)
 
 #include "GitSourceControlUtils.h"
+#define FVector FVectorWorkaround
 #import <AppKit/AppKit.h>
+#undef FVectorWorkaround
 #include "CoreMinimal.h"
 
 #include "Internationalization/Text.h"
