@@ -6,7 +6,7 @@
 #include "GitSourceControlUtils.h"
 #define FVector FVectorWorkaround
 #import <AppKit/AppKit.h>
-#undef FVectorWorkaround
+#undef FVector
 #include "CoreMinimal.h"
 
 #include "Internationalization/Text.h"
